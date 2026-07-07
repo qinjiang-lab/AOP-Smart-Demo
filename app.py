@@ -316,7 +316,7 @@ with st.sidebar:
     max_tokens = st.number_input("Max Output Tokens", value=4096, step=256)
     top_n = st.number_input("Top N KEs", value=5, min_value=1, max_value=20)
     st.markdown("---")
-    st.caption("🤖 Currently using DeepSeek-V4-Flash (lightweight demo version).")
+    st.caption("Currently using DeepSeek-V4-Flash (lightweight demo version).")
     st.caption("💡 This is a cost-efficient variant — results may not fully reflect the capabilities of premium models.")
     st.caption("💰 Each query consumes a small amount of API credit — we're running this demo on a limited budget.")
     st.caption("📧 If the balance runs low, just email me at niuqinjiang@163.com and I'll top it up.")
