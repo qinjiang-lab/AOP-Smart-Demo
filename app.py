@@ -312,9 +312,13 @@ st.title("🧪 AOP-Smart")
 # ---------- 侧边栏：可调参数 ----------
 with st.sidebar:
     st.header("⚙️ parameter setting")
-    temperature = st.slider("Temperature", 0.0, 1.0, 0.0, 0.05)
-    max_tokens = st.number_input("Max Output Tokens", value=4096, step=256)
-    top_n = st.number_input("Top N KEs", value=5, min_value=1, max_value=20)
+    
+    max_tokens = st.number_input("📝 Max Output Tokens", value=4096, step=256)
+    st.caption("Controls AI response length.")
+    
+    top_n = st.number_input("🎯 Top N KEs", value=5, min_value=1, max_value=20)
+    st.caption("How many Key Events to fetch — more context vs. precision.")
+    
     st.markdown("---")
     st.caption("Currently using DeepSeek-V4-Flash (lightweight demo version).")
     st.caption("💡 This is a cost-efficient variant — results may not fully reflect the capabilities of premium models.")
@@ -340,7 +344,7 @@ if st.button("🚀 Run", type="primary"):
 
     # 3. Step 1: 选择 KE（显示进度）
     with st.spinner("🧠 Selecting relevant Key Events ..."):
-        ke_ids = get_relevant_ke_ids(task, MODEL_NAME, temperature, top_n, client)
+        ke_ids = get_relevant_ke_ids(task, MODEL_NAME, 0, top_n, client)
 
     if not ke_ids:
         st.error("❌ No relevant KE was found. Please try another question.")
