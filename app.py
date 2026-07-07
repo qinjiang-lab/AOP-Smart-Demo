@@ -320,11 +320,11 @@ with st.sidebar:
     st.caption("How many Key Events to fetch — more context vs. precision.")
     
     st.markdown("---")
-    st.caption("Currently using DeepSeek-V4-Flash (lightweight demo version).")
-    st.caption("💡 This is a cost-efficient variant — results may not fully reflect the capabilities of premium models.")
-    st.caption("💰 Each query consumes a small amount of API credit — we're running this demo on a limited budget.")
-    st.caption("📧 If the balance runs low, just email me at niuqinjiang@163.com and I'll top it up.")
-    st.caption("🚀 For stronger models, check out local deployment: https://github.com/qinjiang-lab/AOP-Smart")
+st.caption("Currently using DeepSeek-V4-Flash (lightweight demo version).")
+st.caption("💡 This is a cost-efficient variant — results may not fully reflect premium models.")
+st.caption("💰 We've topped up the demo budget — so feel free to explore!")
+st.caption("📧 If the balance somehow runs low, just ping me at niuqinjiang@163.com.")
+st.caption("🚀 For stronger models, check out local deployment: https://github.com/qinjiang-lab/AOP-Smart")
 # ---------- 主区域 ----------
 task = st.text_area("📝 Enter your question（Task）", height=150, placeholder="for example ：What are the key events leading to liver fibrosis?")
 
