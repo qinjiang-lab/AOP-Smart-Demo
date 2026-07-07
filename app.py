@@ -361,9 +361,8 @@ if st.button("🚀 Run", type="primary"):
         f"**Activated KE**: {stats['activated_ke_count']} ({stats['ke_percent']}%)  \n"
         f"**Activated KER**: {stats['activated_ker_count']} ({stats['ker_percent']}%)  \n"
         f"**Activated AOP**: {stats['activated_aop_count']} ({stats['aop_percent']}%)  \n"
-        f"**上下文词数**: {stats['context_word_count']}"
+        f"**Context Token Count (approx.)**: {stats['context_word_count']}"
     )
-    st.info(f"📊 the number of words \n\n{stat_msg}")
 
     # 5. Step 3: 流式推理
     with st.chat_message("assistant"):
