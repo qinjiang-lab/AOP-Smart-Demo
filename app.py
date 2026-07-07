@@ -6,8 +6,8 @@ from openai import OpenAI
 from datetime import datetime
 
 # -------------------------- 全局配置（写死） --------------------------
-BASE_URL = "https://openrouter.ai/api/v1"  # 写死，可替换
-MODEL_NAME = "tencent/hy3:free"  # 写死模型名
+BASE_URL = "https://api.deepseek.com"  # 写死，可替换
+MODEL_NAME = "deepseek-v4-flash"  # 写死模型名
 # API Key 从 st.secrets 中读取，部署时在 Streamlit Cloud 的 Secrets 中设置
 # 本地测试时可在 .streamlit/secrets.toml 中写入：
 # DEEPSEEK_API_KEY = "your-api-key"
@@ -316,47 +316,47 @@ with st.sidebar:
     max_tokens = st.number_input("Max Output Tokens", value=4096, step=256)
     top_n = st.number_input("Top N KEs", value=5, min_value=1, max_value=20)
     st.markdown("---")
-    st.caption("API Key 已在服务器端配置（通过 secrets）")
+    st.caption("Using DeepSeek-V4-Flash (lightweight demo). \n Please note that each query will consume a small amount of credits \n thanks for helping us keep this demo sustainable!")
 
 # ---------- 主区域 ----------
-task = st.text_area("📝 输入你的问题（Task）", height=150, placeholder="例如：What are the key events leading to liver fibrosis?")
+task = st.text_area("📝 Enter your question（Task）", height=150, placeholder="for example ：What are the key events leading to liver fibrosis?")
 
-if st.button("🚀 运行", type="primary"):
+if st.button("🚀 Run", type="primary"):
     if not task.strip():
-        st.warning("请输入问题")
+        st.warning("Please enter your question")
         st.stop()
 
     # 1. 读取 API Key（从 secrets）
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
     if not api_key:
-        st.error("❌ 未找到 API Key，请在 Streamlit Cloud 的 Secrets 中设置 DEEPSEEK_API_KEY")
+        st.error("❌ API Key not found")
         st.stop()
 
     # 2. 初始化 OpenAI 客户端
     client = OpenAI(api_key=api_key, base_url=BASE_URL)
 
     # 3. Step 1: 选择 KE（显示进度）
-    with st.spinner("🧠 正在选择相关 Key Events ..."):
+    with st.spinner("🧠 Selecting relevant Key Events ..."):
         ke_ids = get_relevant_ke_ids(task, MODEL_NAME, temperature, top_n, client)
 
     if not ke_ids:
-        st.error("❌ 未找到相关 KE，请尝试其他问题")
+        st.error("❌ No relevant KE was found. Please try another question.")
         st.stop()
 
-    st.success(f"✅ 选中 {len(ke_ids)} 个 Key Events: {ke_ids}")
+    st.success(f"✅ Select {len(ke_ids)}   Key Events: {ke_ids}")
 
     # 4. Step 2: 构建上下文（显示统计信息）
-    with st.spinner("📚 正在构建上下文 ..."):
+    with st.spinner("📚 Building the context..."):
         context_json, stats = build_context_from_ke_ids(ke_ids)
 
     # 显示统计信息
     stat_msg = (
-        f"**激活的 KE**: {stats['activated_ke_count']} ({stats['ke_percent']}%)  \n"
-        f"**激活的 KER**: {stats['activated_ker_count']} ({stats['ker_percent']}%)  \n"
-        f"**激活的 AOP**: {stats['activated_aop_count']} ({stats['aop_percent']}%)  \n"
+        f"**Activated KE**: {stats['activated_ke_count']} ({stats['ke_percent']}%)  \n"
+        f"**Activated KER**: {stats['activated_ker_count']} ({stats['ker_percent']}%)  \n"
+        f"**Activated AOP**: {stats['activated_aop_count']} ({stats['aop_percent']}%)  \n"
         f"**上下文词数**: {stats['context_word_count']}"
     )
-    st.info(f"📊 上下文统计\n\n{stat_msg}")
+    st.info(f"📊 the number of words \n\n{stat_msg}")
 
     # 5. Step 3: 流式推理
     with st.chat_message("assistant"):
@@ -387,7 +387,7 @@ if st.button("🚀 运行", type="primary"):
                     if chunk.choices and chunk.choices[0].delta.content:
                         yield chunk.choices[0].delta.content
             except Exception as e:
-                yield f"\n\n❌ 错误: {e}"
+                yield f"\n\n❌ Error: {e}"
 
 
         # 使用 st.write_stream 实现流式输出
