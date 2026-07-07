@@ -6,8 +6,8 @@ from openai import OpenAI
 from datetime import datetime
 
 # -------------------------- 全局配置（写死） --------------------------
-BASE_URL = "https://api.deepseek.com"  # 写死，可替换
-MODEL_NAME = "deepseek-chat"  # 写死模型名
+BASE_URL = "https://openrouter.ai/api/v1"  # 写死，可替换
+MODEL_NAME = "tencent/hy3:free"  # 写死模型名
 # API Key 从 st.secrets 中读取，部署时在 Streamlit Cloud 的 Secrets 中设置
 # 本地测试时可在 .streamlit/secrets.toml 中写入：
 # DEEPSEEK_API_KEY = "your-api-key"
