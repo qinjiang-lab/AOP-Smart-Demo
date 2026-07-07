@@ -311,13 +311,15 @@ st.title("🧪 AOP-Smart")
 
 # ---------- 侧边栏：可调参数 ----------
 with st.sidebar:
-    st.header("⚙️ 参数设置")
+    st.header("⚙️ parameter setting")
     temperature = st.slider("Temperature", 0.0, 1.0, 0.0, 0.05)
     max_tokens = st.number_input("Max Output Tokens", value=4096, step=256)
     top_n = st.number_input("Top N KEs", value=5, min_value=1, max_value=20)
     st.markdown("---")
-    st.caption("Using DeepSeek-V4-Flash (lightweight demo). \n Please note that each query will consume a small amount of credits \n thanks for helping us keep this demo sustainable!")
-
+    st.caption("🤖 Currently using DeepSeek-V4-Flash (lightweight demo version).")
+    st.caption("💰 We're a small team with a limited demo budget, so each query does incur a small cost.")
+    st.caption("🙏 If you find the balance insufficient, please feel free to reach out to me at niuqinjiang@163.com, and I'll top it up.")
+    st.caption("🚀 For access to more powerful models, you can also explore local deployment here: https://github.com/qinjiang-lab/AOP-Smart")
 # ---------- 主区域 ----------
 task = st.text_area("📝 Enter your question（Task）", height=150, placeholder="for example ：What are the key events leading to liver fibrosis?")
 
