@@ -317,9 +317,10 @@ with st.sidebar:
     top_n = st.number_input("Top N KEs", value=5, min_value=1, max_value=20)
     st.markdown("---")
     st.caption("🤖 Currently using DeepSeek-V4-Flash (lightweight demo version).")
-    st.caption("💰 We're a small team with a limited demo budget, so each query does incur a small cost.")
-    st.caption("🙏 If you find the balance insufficient, please feel free to reach out to me at niuqinjiang@163.com, and I'll top it up.")
-    st.caption("🚀 For access to more powerful models, you can also explore local deployment here: https://github.com/qinjiang-lab/AOP-Smart")
+    st.caption("💡 This is a cost-efficient variant — results may not fully reflect the capabilities of premium models.")
+    st.caption("💰 Each query consumes a small amount of API credit — we're running this demo on a limited budget.")
+    st.caption("📧 If the balance runs low, just email me at niuqinjiang@163.com and I'll top it up.")
+    st.caption("🚀 For stronger models, check out local deployment: https://github.com/qinjiang-lab/AOP-Smart")
 # ---------- 主区域 ----------
 task = st.text_area("📝 Enter your question（Task）", height=150, placeholder="for example ：What are the key events leading to liver fibrosis?")
 
