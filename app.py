@@ -341,10 +341,10 @@ if st.button("🚀 Run", type="primary"):
 
     # 2. 初始化 OpenAI 客户端
     client = OpenAI(api_key=api_key, base_url=BASE_URL)
-
+    temperature = 0
     # 3. Step 1: 选择 KE（显示进度）
     with st.spinner("🧠 Selecting relevant Key Events ..."):
-        ke_ids = get_relevant_ke_ids(task, MODEL_NAME, 0, top_n, client)
+        ke_ids = get_relevant_ke_ids(task, MODEL_NAME, temperature, top_n, client)
 
     if not ke_ids:
         st.error("❌ No relevant KE was found. Please try another question.")
