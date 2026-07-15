@@ -512,6 +512,8 @@ Constraints:
 
 # -------------------------- Streamlit 界面 --------------------------
 st.set_page_config(page_title="AOP-Smart", layout="wide")
+if "running" not in st.session_state:
+    st.session_state.running = False
 st.title("🧪 AOP-Smart")
 
 # 初始化 session_state 预设状态
@@ -614,6 +616,7 @@ task = st.text_area("📝 Enter your question (Task)", key="task_input", height=
                     placeholder="e.g. What are the key events leading to liver fibrosis?")
 
 if st.button("🚀 Run", type="primary"):
+    st.session_state.running = True
     if not task.strip():
         st.warning("Please enter your question")
         st.stop()
@@ -685,14 +688,20 @@ if st.button("🚀 Run", type="primary"):
 
 
         # 手动收集流式内容，结束后替换 KE ID 为超链接
-        placeholder = st.empty()
-        full_response = ""
+        try:
+            # 流式输出（你现有的代码）
+            placeholder = st.empty()
+            full_response = ""
+            for chunk in generate_response(final_question):
+                full_response += chunk
+                placeholder.markdown(full_response + "▌")
+            # 替换 KE ID 为超链接
+            linked_response = link_ke_ids(full_response)
+            placeholder.markdown(linked_response, unsafe_allow_html=True)
 
-        # 流式输出并实时显示（带光标效果）
-        for chunk in generate_response(final_question):
-            full_response += chunk
-            placeholder.markdown(full_response + "▌")
-
-        # 输出完成后，替换 KE ID 为超链接
-        linked_response = link_ke_ids(full_response)
-        placeholder.markdown(linked_response, unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Error: {e}")
+        finally:
+            # 无论成功或失败，都要解锁按钮
+            st.session_state.running = False
+            st.rerun()  # 刷新界面，使按钮变为可用
