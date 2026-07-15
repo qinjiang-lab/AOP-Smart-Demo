@@ -511,15 +511,23 @@ with st.sidebar:
     max_tokens = st.number_input("📝 Max Output Tokens", value=20480, step=256)
     st.caption("Controls AI response length.")
     
-    top_n = st.number_input("🎯 Top N KEs", value=5, min_value=1, max_value=20)
+    top_n = st.number_input("🎯 Top N KEs", value=10, min_value=1, max_value=500)
     st.caption("How many Key Events to fetch — more context vs. precision.")
+
+    st.markdown("---")
+    st.markdown("### 📖 How to use")
+    st.markdown("""
+    1. **Click** a preset button (e.g., *Literature Analysis*) above the input box.  
+    2. **Paste** your article or question into the text area.  
+    3. **Press** the *Run* button and wait for the AI to generate the AOP report.
+    """)
+    st.caption("💡 The preset adds a structured prompt to guide the AI. You can also leave it empty and enter your own question.")
     
     st.markdown("---")
     st.caption("Currently using DeepSeek-V4-Flash (lightweight demo version).")
-    st.caption("💡 This is a cost-efficient variant — results may not fully reflect premium models.")
-    st.caption("💰 We've topped up the demo budget — so feel free to explore!")
-    st.caption("📧 If the balance somehow runs low, just ping me at niuqinjiang@163.com.")
+    st.caption("📧 If you have any related questions, just ping me at niuqinjiang@163.com.")
     st.caption("🚀 For stronger models, check out local deployment: https://github.com/qinjiang-lab/AOP-Smart")
+    st.caption("Current Preset Literature Analysis")
 
 # ---------- 主区域：预设按钮 ----------
 st.markdown("---")
