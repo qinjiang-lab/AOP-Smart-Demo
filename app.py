@@ -547,12 +547,15 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📖 How to use")
     st.markdown("""
-    1. **Click** a preset button (e.g., *Literature Analysis*) above the input box.  
-    2. **Paste** your article or question into the text area.  
-    3. **Press** the *Run* button and wait for the AI to generate the AOP report.
+    1. **For literature-based AOP analysis**, you **must** click the **Literature Analysis** preset button first.  
+    2. **Upload a PDF** (auto-fills content) or **paste** your article text manually into the input area.  
+    3. **Press the *Run* button** and wait — generation may take a while due to network or server load; please be patient.  
+    4. If no result appears, simply **click *Run* again** to retry.  
+    5. To **build your own prompt** without the preset, click **Clear Preset** and enter your custom question freely.
     """)
     st.caption(
         "💡 The preset adds a structured prompt to guide the AI. You can also leave it empty and enter your own question.")
+    st.markdown("---")
 
     st.markdown("---")
     st.caption("Currently using DeepSeek-V4-Flash (lightweight demo version).")
