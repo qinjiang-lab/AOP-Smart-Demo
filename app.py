@@ -24,13 +24,13 @@ SMART_FILE = "./AOP-Smart.json"
 PRESETS = {
     "Literature Analysis":
         """Your task is to convert the input toxicological article into a **structured AOP representation** grounded in the provided AOP knowledge base.
-    
+
     ---
-    
+
     # General Principles
-    
+
     Please follow these rules:
-    
+
     1. Only extract biological mechanisms supported by evidence from the paper.
     2. Do not invent Key Events (KEs), Key Event Relationships (KERs), or AOP-Wiki IDs.
     3. If no suitable AOP-Wiki entity exists, explicitly mark it as **Missing**.
@@ -40,147 +40,147 @@ PRESETS = {
        - Confirmed evidence
        - Strong mechanistic inference
        - Hypothetical knowledge gaps
-    
+
     The final output should be concise, structured, and suitable for AOP knowledge curation.
-    
+
     ---
-    
+
     # Step 1. Key Event (KE) Extraction
-    
+
     Identify all biologically meaningful Key Events described in the article.
-    
+
     Exclude:
     - Simple experimental observations without mechanistic meaning.
     - General physiological changes without clear biological relevance.
-    
+
     For each Key Event, generate the following table:
-    
+
     | AOP-Wiki KE ID | KE Title | Description | Biological Level | Organ/Tissue | Cell Type | Evidence Type | Evidence from Paper |
     |---|---|---|---|---|---|---|
-    
+
     ## Requirements:
-    
+
     ### AOP-Wiki KE ID
     - If an exact matching KE exists in the provided knowledge base:
       - Provide the KE ID, example: KE1576
     - If no suitable KE exists:
       - Write: `Missing`
-    
+
     ### KE Title
     - Use official AOP-Wiki terminology whenever possible.
     - If missing, provide a concise biological event name.
-    
+
     ### Biological Level
     Choose one:
-    
+
     - Molecular
     - Cellular
     - Tissue
     - Organ
     - Organism
-    
+
     ### Description
     - The description field is limited to one sentence.
-    
+
     ### Evidence Type
-    
+
     Choose one:
-    
+
     - Direct experimental evidence
     - Strong mechanistic inference
     - Hypothetical extension
-    
+
     ### Evidence from Paper
     Provide:
     - The most relevant experimental finding.
     - A short quote or accurate summary from the article.
-    
+
     ---
-    
+
     # Step 2. Key Event Relationship (KER) Extraction
-    
+
     Identify causal relationships between Key Events.
-    
+
     Only include relationships supported by:
-    
+
     - Experimental evidence from the paper, or
     - Strong established biological mechanisms.
-    
+
     Do not create KERs only because two events are biologically related;
     the relationship must represent a causal transition within an AOP framework.
-    
+
     Generate the following table:
-    
+
     | Upstream KE | Downstream KE | KE IDs | Relationship Description | Evidence Type | Evidence from Paper |
     |---|---|---|---|---|---|
-    
+
     ## Requirements:
-    
+
     ### KE IDs format:
-    
+
     Examples:
-    
+
     KE1115 → KE1392
     KE1115 → Missing
     Missing → KE344
-    
+
     ### Evidence Type:
     - Direct experimental evidence
     - Strong mechanistic inference
     - Hypothetical extension
-    
+
     ### Relationship Description
-    
+
     Briefly explain:
-    
+
     - Biological mechanism
     - Direction of change
     - Why upstream event can lead to downstream event
-    
+
     Do not include unsupported causal assumptions.
-    
+
     ---
-    
+
     # Step 3. Candidate AOP Reconstruction
-    
+
     ## Candidate AOP Reconstruction and Comparison with Existing AOPs
-    
+
     Generate:
-    
+
     ### Candidate AOP
-    
+
     Stressor → MIE → KE1 → KE2 → ... → AO
-    
-    
+
+
     ### Closest Existing AOP-Wiki Pathway
-    
+
     AOP ID:
     AOP title:
-    
+
     Stressor → MIE → KE1 → KE2 → ... → AO
-    
+
     ### MIE
     If the molecular initiating event cannot be identified, explicitly state "Unknown".
     Do not infer an MIE solely from downstream events.
-    
+
     ### AOP
     Only report an existing AOP if the pathway is explicitly available in the provided AOP knowledge base.
     Otherwise write: No matching AOP identified.
-    
+
     ### Comparison
-    
+
     Explain:
     - Shared Key Events
     - Different Key Events
     - Missing KERs
     - Potential extension of existing AOP
-    
+
     ---
-    
+
     # Final Output Requirements
-    
+
     The final response must:
-    
+
     - Use Markdown tables.
     - Avoid unnecessary long explanations.
     - Keep each description concise.
@@ -189,25 +189,25 @@ PRESETS = {
       - KE IDs
       - KER IDs
       - Existing AOP pathways
-    
+
     Always distinguish:
-    
+
     ## Confirmed AOP Knowledge
-    
+
     (Directly supported by experimental evidence)
-    
+
     ## Missing Knowledge
-    
+
     (Not represented in current AOP-Wiki but suggested by the paper)
-    
+
     ## Hypothetical Extensions
-    
+
     (Mechanistically plausible but requiring further validation)
-    
+
     ---
-    
+
     # Input Article
-    
+
     [Insert full paper text here]""",  # <--- 请自行粘贴完整的 "Literature Analysis" 提示词
     "Developing1": "developing。",
     "Developing2": "developing。",
@@ -512,17 +512,24 @@ Constraints:
 
 # -------------------------- Streamlit 界面 --------------------------
 st.set_page_config(page_title="AOP-Smart", layout="wide")
+
+# ---------- 初始化 session_state ----------
 if "running" not in st.session_state:
     st.session_state.running = False
-st.title("🧪 AOP-Smart")
-
-# 初始化 session_state 预设状态
+if "analysis_started" not in st.session_state:
+    st.session_state.analysis_started = False
 if "preset_prompt" not in st.session_state:
     st.session_state.preset_prompt = ""
 if "preset_name" not in st.session_state:
     st.session_state.preset_name = "None"
 if "task_input" not in st.session_state:
     st.session_state.task_input = ""
+if "pdf_processed" not in st.session_state:
+    st.session_state.pdf_processed = False
+if "last_pdf_key" not in st.session_state:
+    st.session_state.last_pdf_key = ""
+
+st.title("🧪 AOP-Smart")
 
 # ---------- 侧边栏 ----------
 with st.sidebar:
@@ -557,9 +564,8 @@ with col_state:
     st.write(f"**Current Preset:** {st.session_state.preset_name}")
 
 with col_buttons:
-    # 根据 PRESETS 数量生成按钮
     num_presets = len(PRESETS)
-    cols = st.columns(num_presets + 1)  # +1 给 Clear 按钮
+    cols = st.columns(num_presets + 1)
     for idx, (name, prompt) in enumerate(PRESETS.items()):
         with cols[idx]:
             if st.button(name, key=f"preset_{idx}"):
@@ -573,19 +579,15 @@ with col_buttons:
             st.rerun()
 st.markdown("---")
 
-# ---------- 新增：PDF 上传按钮 ----------
+# ---------- PDF 上传按钮 ----------
 uploaded_file = st.file_uploader("📄 Upload PDF (optional — auto-fills content below)", type="pdf", key="pdf_uploader")
 
 if uploaded_file is not None:
-    # 生成当前文件的唯一标识（文件名+大小）
     current_key = f"{uploaded_file.name}_{uploaded_file.size}"
-
-    # 如果文件发生了更换，重置处理标志
     if st.session_state.get("last_pdf_key") != current_key:
         st.session_state.pdf_processed = False
         st.session_state.last_pdf_key = current_key
 
-    # 仅当文件尚未处理时才执行解析
     if not st.session_state.get("pdf_processed", False):
         with st.spinner("Extracting text from PDF..."):
             try:
@@ -598,109 +600,132 @@ if uploaded_file is not None:
                         full_text += text + "\n"
                 if full_text.strip():
                     st.session_state.task_input = full_text
-                    st.session_state.pdf_processed = True  # 标记已处理
+                    st.session_state.pdf_processed = True
                     st.success(
                         f"✅ PDF parsed! {len(reader.pages)} pages, {len(full_text)} characters extracted. Content filled in below.")
-                    st.rerun()  # 刷新界面使输入框显示新内容
+                    st.rerun()
                 else:
                     st.warning(
                         "⚠️ No text could be extracted. The PDF might be scanned. Please paste content manually.")
-                    # 扫描版 PDF 无法处理，不设置 processed，避免卡死
             except Exception as e:
                 st.error(f"❌ Failed to parse PDF: {e}")
-                # 出错时重置标志，以便用户重新上传
                 st.session_state.pdf_processed = False
 
 # ---------- 主区域：输入框 ----------
 task = st.text_area("📝 Enter your question (Task)", key="task_input", height=150,
                     placeholder="e.g. What are the key events leading to liver fibrosis?")
 
+# ---------- Run 按钮 ----------
+# 按钮点击后只设置运行标志并刷新页面，立刻锁定按钮
 if st.button("🚀 Run", type="primary", disabled=st.session_state.running):
     st.session_state.running = True
-    if not task.strip():
-        st.warning("Please enter your question")
-        st.stop()
+    st.session_state.analysis_started = False  # 确保每次点击重新开始
+    st.rerun()
 
-    # 拼接预设
-    preset = st.session_state.get("preset_prompt", "")
-    final_question = preset + "\n\n" + task if preset else task
+# ---------- 分析执行块（在按钮外部） ----------
+if st.session_state.running and not st.session_state.analysis_started:
+    # 防止重复执行，设置标志
+    st.session_state.analysis_started = True
 
-    # 1. 读取 API Key
-    api_key = st.secrets.get("DEEPSEEK_API_KEY")
-    if not api_key:
-        st.error("❌ API Key not found. Please set DEEPSEEK_API_KEY in secrets.")
-        st.stop()
-
-    client = OpenAI(api_key=api_key, base_url=BASE_URL)
-    temperature = 0.0
-
-    # 2. Step 1: KE 选择（使用原始 task，不包含预设）
-    with st.spinner("🧠 Selecting relevant Key Events ..."):
-        ke_ids = get_relevant_ke_ids(task, MODEL_NAME, temperature, top_n, client)
-
-    if not ke_ids:
-        st.error("❌ No relevant KE was found. Please try another question.")
-        st.stop()
-
-    st.success(f"✅ Selected {len(ke_ids)} Key Events: {ke_ids}")
-
-    # 3. Step 2: 构建上下文
-    with st.spinner("📚 Building the context..."):
-        context_json, stats = build_context_from_ke_ids(ke_ids)
-
-    stat_msg = (
-        f"**Activated KE**: {stats['activated_ke_count']} ({stats['ke_percent']}%)  \n"
-        f"**Activated KER**: {stats['activated_ker_count']} ({stats['ker_percent']}%)  \n"
-        f"**Activated AOP**: {stats['activated_aop_count']} ({stats['aop_percent']}%)  \n"
-        f"**Context Token Count (approx.)**: {stats['context_word_count']}"
-    )
-    st.info(stat_msg)
-
-    # 4. Step 3: 流式推理（使用 final_question）
-    with st.chat_message("assistant"):
-        # 定义生成器
-        def generate_response(question):
-            try:
-                stream = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=[
-                        {"role": "system",
-                         "content": "You are AOP-Smart, an AI assistant for AOP reasoning. Answer based on provided context."},
-                        {"role": "user", "content": f"""
-<AOP_CONTEXT>
-{context_json}
-</AOP_CONTEXT>
-
-<Question>
-{question}
-</Question>
-"""}
-                    ],
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    stream=True
-                )
-                for chunk in stream:
-                    if chunk.choices and chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
-            except Exception as e:
-                yield f"\n\n❌ Error: {e}"
-
-
-        # 手动收集流式内容，结束后替换 KE ID 为超链接
-        try:
-            placeholder = st.empty()
-            full_response = ""
-            for chunk in generate_response(final_question):
-                full_response += chunk
-                placeholder.markdown(full_response + "▌")
-            # 替换 KE ID 为超链接
-            linked_response = link_ke_ids(full_response)
-            placeholder.markdown(linked_response, unsafe_allow_html=True)
-
-        except Exception as e:
-            st.error(f"Error: {e}")
-        finally:
-            # 无论成功或失败，都要解锁按钮
+    try:
+        # 读取输入
+        task = st.session_state.task_input
+        if not task.strip():
+            st.warning("Please enter your question")
             st.session_state.running = False
-            st.rerun()  # 刷新界面，使按钮变为可用
+            st.session_state.analysis_started = False
+            st.rerun()
+            st.stop()
+
+        # 拼接预设
+        preset = st.session_state.get("preset_prompt", "")
+        final_question = preset + "\n\n" + task if preset else task
+
+        # 1. 读取 API Key
+        api_key = st.secrets.get("DEEPSEEK_API_KEY")
+        if not api_key:
+            st.error("❌ API Key not found. Please set DEEPSEEK_API_KEY in secrets.")
+            st.session_state.running = False
+            st.session_state.analysis_started = False
+            st.rerun()
+            st.stop()
+
+        client = OpenAI(api_key=api_key, base_url=BASE_URL)
+        temperature = 0.0
+
+        # 2. Step 1: KE 选择（使用原始 task，不包含预设）
+        with st.spinner("🧠 Selecting relevant Key Events ..."):
+            ke_ids = get_relevant_ke_ids(task, MODEL_NAME, temperature, top_n, client)
+
+        if not ke_ids:
+            st.error("❌ No relevant KE was found. Please try another question.")
+            st.session_state.running = False
+            st.session_state.analysis_started = False
+            st.rerun()
+            st.stop()
+
+        st.success(f"✅ Selected {len(ke_ids)} Key Events: {ke_ids}")
+
+        # 3. Step 2: 构建上下文
+        with st.spinner("📚 Building the context..."):
+            context_json, stats = build_context_from_ke_ids(ke_ids)
+
+        stat_msg = (
+            f"**Activated KE**: {stats['activated_ke_count']} ({stats['ke_percent']}%)  \n"
+            f"**Activated KER**: {stats['activated_ker_count']} ({stats['ker_percent']}%)  \n"
+            f"**Activated AOP**: {stats['activated_aop_count']} ({stats['aop_percent']}%)  \n"
+            f"**Context Token Count (approx.)**: {stats['context_word_count']}"
+        )
+        st.info(stat_msg)
+
+        # 4. Step 3: 流式推理（使用 final_question）
+        with st.chat_message("assistant"):
+            def generate_response(question):
+                try:
+                    stream = client.chat.completions.create(
+                        model=MODEL_NAME,
+                        messages=[
+                            {"role": "system",
+                             "content": "You are AOP-Smart, an AI assistant for AOP reasoning. Answer based on provided context."},
+                            {"role": "user", "content": f"""
+        <AOP_CONTEXT>
+        {context_json}
+        </AOP_CONTEXT>
+
+        <Question>
+        {question}
+        </Question>
+        """}
+                        ],
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        stream=True
+                    )
+                    for chunk in stream:
+                        if chunk.choices and chunk.choices[0].delta.content:
+                            yield chunk.choices[0].delta.content
+                except Exception as e:
+                    yield f"\n\n❌ Error: {e}"
+
+
+            try:
+                placeholder = st.empty()
+                full_response = ""
+                for chunk in generate_response(final_question):
+                    full_response += chunk
+                    placeholder.markdown(full_response + "▌")
+                # 替换 KE ID 为超链接
+                linked_response = link_ke_ids(full_response)
+                placeholder.markdown(linked_response, unsafe_allow_html=True)
+
+            except Exception as e:
+                st.error(f"Error during response generation: {e}")
+
+    except Exception as e:
+        st.error(f"Unexpected error: {e}")
+
+    finally:
+        # 分析结束，解锁按钮
+        st.session_state.running = False
+        st.session_state.analysis_started = False
+        st.rerun()
