@@ -615,7 +615,7 @@ if uploaded_file is not None:
 task = st.text_area("📝 Enter your question (Task)", key="task_input", height=150,
                     placeholder="e.g. What are the key events leading to liver fibrosis?")
 
-if st.button("🚀 Run", type="primary"):
+if st.button("🚀 Run", type="primary", disabled=st.session_state.running):
     st.session_state.running = True
     if not task.strip():
         st.warning("Please enter your question")
@@ -689,7 +689,6 @@ if st.button("🚀 Run", type="primary"):
 
         # 手动收集流式内容，结束后替换 KE ID 为超链接
         try:
-            # 流式输出（你现有的代码）
             placeholder = st.empty()
             full_response = ""
             for chunk in generate_response(final_question):
