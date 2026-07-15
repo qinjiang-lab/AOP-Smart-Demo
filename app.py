@@ -4,6 +4,8 @@ import re
 from html import unescape
 from openai import OpenAI
 from datetime import datetime
+from pypdf import PdfReader
+from io import BytesIO
 
 # -------------------------- 全局配置（写死） --------------------------
 BASE_URL = "https://api.deepseek.com"          # 可替换
@@ -514,6 +516,8 @@ if "preset_prompt" not in st.session_state:
     st.session_state.preset_prompt = ""
 if "preset_name" not in st.session_state:
     st.session_state.preset_name = "None"
+if "task_input" not in st.session_state:
+    st.session_state.task_input = ""
 
 # ---------- 侧边栏 ----------
 with st.sidebar:
@@ -562,6 +566,28 @@ with col_buttons:
             st.session_state.preset_name = "None"
             st.rerun()
 st.markdown("---")
+
+# ---------- 新增：PDF 上传按钮 ----------
+uploaded_file = st.file_uploader("📄 Upload PDF (optional — auto-fills content below)", type="pdf")
+
+if uploaded_file is not None:
+    with st.spinner("Extracting text from PDF..."):
+        try:
+            pdf_bytes = BytesIO(uploaded_file.read())
+            reader = PdfReader(pdf_bytes)
+            full_text = ""
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    full_text += text + "\n"
+            if full_text.strip():
+                st.session_state.task_input = full_text
+                st.success(f"✅ PDF parsed! {len(reader.pages)} pages, {len(full_text)} characters extracted. Content filled in below.")
+                st.rerun()
+            else:
+                st.warning("⚠️ No text could be extracted. The PDF might be scanned. Please paste content manually.")
+        except Exception as e:
+            st.error(f"❌ Failed to parse PDF: {e}")
 
 # ---------- 主区域：输入框 ----------
 task = st.text_area("📝 Enter your question (Task)", key="task_input", height=150,
@@ -648,6 +674,3 @@ if st.button("🚀 Run", type="primary"):
         # 输出完成后，替换 KE ID 为超链接
         linked_response = link_ke_ids(full_response)
         placeholder.markdown(linked_response, unsafe_allow_html=True)
-
-    # 可选：保存历史（可自行添加）
-    # 如想保存，可写入 session_state 或文件
