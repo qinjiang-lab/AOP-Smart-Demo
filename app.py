@@ -619,7 +619,7 @@ if uploaded_file is not None:
 
 # ---------- 主区域：输入框 ----------
 task = st.text_area("📝 Enter your question (Task)", key="task_input", height=150,
-                    placeholder="e.g. What are the key events leading to liver fibrosis?")
+                    placeholder="Please enter your question.")
 
 # ---------- 显示之前保存的结果（如果有） ----------
 if st.session_state.last_result:
