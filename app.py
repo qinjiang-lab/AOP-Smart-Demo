@@ -7,222 +7,226 @@ from datetime import datetime
 from pypdf import PdfReader
 from io import BytesIO
 
-# -------------------------- 全局配置（写死） --------------------------
-BASE_URL = "https://api.deepseek.com"          # 可替换
-MODEL_NAME = "deepseek-v4-flash"              # 写死模型名
+# -------------------------- 全局配置 --------------------------
+BASE_URL = "https://api.deepseek.com"  # 可替换
+MODEL_NAME = "deepseek-v4-flash"  # 写死模型名
 # API Key 从 st.secrets 中读取
-# 本地测试时可在 .streamlit/secrets.toml 中写入：
-# DEEPSEEK_API_KEY = "your-api-key"
+
+clean_text_ke = 200
+clean_text_ker = 120
+clean_text_ao = 250
 
 # -------------------------- 文件路径 --------------------------
 INDEX_FILE = "./Index.txt"
 SMART_FILE = "./AOP-Smart.json"
 
 # -------------------------- 预设提示词字典 --------------------------
-# 注意：长提示词（Literature Analysis）请自行填入完整的英文 prompt。
-# 这里只留占位符，以免代码过长。
 PRESETS = {
-    "Literature Analysis": 
-    """Your task is to convert the input toxicological article into a **structured AOP representation** grounded in the provided AOP knowledge base.
-
----
-
-# General Principles
-
-Please follow these rules:
-
-1. Only extract biological mechanisms supported by evidence from the paper.
-2. Do not invent Key Events (KEs), Key Event Relationships (KERs), or AOP-Wiki IDs.
-3. If no suitable AOP-Wiki entity exists, explicitly mark it as **Missing**.
-4. Prefer precision over recall.
-5. Maintain traceability between extracted knowledge and the original paper.
-6. Clearly distinguish:
-   - Confirmed evidence
-   - Strong mechanistic inference
-   - Hypothetical knowledge gaps
-
-The final output should be concise, structured, and suitable for AOP knowledge curation.
-
----
-
-# Step 1. Key Event (KE) Extraction
-
-Identify all biologically meaningful Key Events described in the article.
-
-Exclude:
-- Simple experimental observations without mechanistic meaning.
-- General physiological changes without clear biological relevance.
-
-For each Key Event, generate the following table:
-
-| AOP-Wiki KE ID | KE Title | Description | Biological Level | Organ/Tissue | Cell Type | Evidence Type | Evidence from Paper |
-|---|---|---|---|---|---|---|
-
-## Requirements:
-
-### AOP-Wiki KE ID
-- If an exact matching KE exists in the provided knowledge base:
-  - Provide the KE ID, example: KE1576
-- If no suitable KE exists:
-  - Write: `Missing`
-
-### KE Title
-- Use official AOP-Wiki terminology whenever possible.
-- If missing, provide a concise biological event name.
-
-### Biological Level
-Choose one:
-
-- Molecular
-- Cellular
-- Tissue
-- Organ
-- Organism
-
-### Description
-- The description field is limited to one sentence.
-
-### Evidence Type
-
-Choose one:
-
-- Direct experimental evidence
-- Strong mechanistic inference
-- Hypothetical extension
-
-### Evidence from Paper
-Provide:
-- The most relevant experimental finding.
-- A short quote or accurate summary from the article.
-
----
-
-# Step 2. Key Event Relationship (KER) Extraction
-
-Identify causal relationships between Key Events.
-
-Only include relationships supported by:
-
-- Experimental evidence from the paper, or
-- Strong established biological mechanisms.
-
-Do not create KERs only because two events are biologically related;
-the relationship must represent a causal transition within an AOP framework.
-
-Generate the following table:
-
-| Upstream KE | Downstream KE | KE IDs | Relationship Description | Evidence Type | Evidence from Paper |
-|---|---|---|---|---|---|
-
-## Requirements:
-
-### KE IDs format:
-
-Examples:
-
-KE1115 → KE1392
-KE1115 → Missing
-Missing → KE344
-
-### Evidence Type:
-- Direct experimental evidence
-- Strong mechanistic inference
-- Hypothetical extension
-
-### Relationship Description
-
-Briefly explain:
-
-- Biological mechanism
-- Direction of change
-- Why upstream event can lead to downstream event
-
-Do not include unsupported causal assumptions.
-
----
-
-# Step 3. Candidate AOP Reconstruction
-
-## Candidate AOP Reconstruction and Comparison with Existing AOPs
-
-Generate:
-
-### Candidate AOP
-
-Stressor → MIE → KE1 → KE2 → ... → AO
-
-
-### Closest Existing AOP-Wiki Pathway
-
-AOP ID:
-AOP title:
-
-Stressor → MIE → KE1 → KE2 → ... → AO
-
-### MIE
-If the molecular initiating event cannot be identified, explicitly state "Unknown".
-Do not infer an MIE solely from downstream events.
-
-### AOP
-Only report an existing AOP if the pathway is explicitly available in the provided AOP knowledge base.
-Otherwise write: No matching AOP identified.
-
-### Comparison
-
-Explain:
-- Shared Key Events
-- Different Key Events
-- Missing KERs
-- Potential extension of existing AOP
-
----
-
-# Final Output Requirements
-
-The final response must:
-
-- Use Markdown tables.
-- Avoid unnecessary long explanations.
-- Keep each description concise.
-- Preserve evidence traceability.
-- Never fabricate:
-  - KE IDs
-  - KER IDs
-  - Existing AOP pathways
-
-Always distinguish:
-
-## Confirmed AOP Knowledge
-
-(Directly supported by experimental evidence)
-
-## Missing Knowledge
-
-(Not represented in current AOP-Wiki but suggested by the paper)
-
-## Hypothetical Extensions
-
-(Mechanistically plausible but requiring further validation)
-
----
-
-# Input Article
-
-[Insert full paper text here]""",   # <--- 请自行粘贴完整的 "Literature Analysis" 提示词
-    "毒性预测": "分析以下文献，预测该化学物质可能触发的AOP通路，并说明从分子起始事件到不良结局的因果链条。",
-    "机制总结": "请归纳以下文献中描述的AOP机制，重点说明KE之间的因果关系和生物学合理性。",
+    "Literature Analysis":
+        """Your task is to convert the input toxicological article into a **structured AOP representation** grounded in the provided AOP knowledge base.
+    
+    ---
+    
+    # General Principles
+    
+    Please follow these rules:
+    
+    1. Only extract biological mechanisms supported by evidence from the paper.
+    2. Do not invent Key Events (KEs), Key Event Relationships (KERs), or AOP-Wiki IDs.
+    3. If no suitable AOP-Wiki entity exists, explicitly mark it as **Missing**.
+    4. Prefer precision over recall.
+    5. Maintain traceability between extracted knowledge and the original paper.
+    6. Clearly distinguish:
+       - Confirmed evidence
+       - Strong mechanistic inference
+       - Hypothetical knowledge gaps
+    
+    The final output should be concise, structured, and suitable for AOP knowledge curation.
+    
+    ---
+    
+    # Step 1. Key Event (KE) Extraction
+    
+    Identify all biologically meaningful Key Events described in the article.
+    
+    Exclude:
+    - Simple experimental observations without mechanistic meaning.
+    - General physiological changes without clear biological relevance.
+    
+    For each Key Event, generate the following table:
+    
+    | AOP-Wiki KE ID | KE Title | Description | Biological Level | Organ/Tissue | Cell Type | Evidence Type | Evidence from Paper |
+    |---|---|---|---|---|---|---|
+    
+    ## Requirements:
+    
+    ### AOP-Wiki KE ID
+    - If an exact matching KE exists in the provided knowledge base:
+      - Provide the KE ID, example: KE1576
+    - If no suitable KE exists:
+      - Write: `Missing`
+    
+    ### KE Title
+    - Use official AOP-Wiki terminology whenever possible.
+    - If missing, provide a concise biological event name.
+    
+    ### Biological Level
+    Choose one:
+    
+    - Molecular
+    - Cellular
+    - Tissue
+    - Organ
+    - Organism
+    
+    ### Description
+    - The description field is limited to one sentence.
+    
+    ### Evidence Type
+    
+    Choose one:
+    
+    - Direct experimental evidence
+    - Strong mechanistic inference
+    - Hypothetical extension
+    
+    ### Evidence from Paper
+    Provide:
+    - The most relevant experimental finding.
+    - A short quote or accurate summary from the article.
+    
+    ---
+    
+    # Step 2. Key Event Relationship (KER) Extraction
+    
+    Identify causal relationships between Key Events.
+    
+    Only include relationships supported by:
+    
+    - Experimental evidence from the paper, or
+    - Strong established biological mechanisms.
+    
+    Do not create KERs only because two events are biologically related;
+    the relationship must represent a causal transition within an AOP framework.
+    
+    Generate the following table:
+    
+    | Upstream KE | Downstream KE | KE IDs | Relationship Description | Evidence Type | Evidence from Paper |
+    |---|---|---|---|---|---|
+    
+    ## Requirements:
+    
+    ### KE IDs format:
+    
+    Examples:
+    
+    KE1115 → KE1392
+    KE1115 → Missing
+    Missing → KE344
+    
+    ### Evidence Type:
+    - Direct experimental evidence
+    - Strong mechanistic inference
+    - Hypothetical extension
+    
+    ### Relationship Description
+    
+    Briefly explain:
+    
+    - Biological mechanism
+    - Direction of change
+    - Why upstream event can lead to downstream event
+    
+    Do not include unsupported causal assumptions.
+    
+    ---
+    
+    # Step 3. Candidate AOP Reconstruction
+    
+    ## Candidate AOP Reconstruction and Comparison with Existing AOPs
+    
+    Generate:
+    
+    ### Candidate AOP
+    
+    Stressor → MIE → KE1 → KE2 → ... → AO
+    
+    
+    ### Closest Existing AOP-Wiki Pathway
+    
+    AOP ID:
+    AOP title:
+    
+    Stressor → MIE → KE1 → KE2 → ... → AO
+    
+    ### MIE
+    If the molecular initiating event cannot be identified, explicitly state "Unknown".
+    Do not infer an MIE solely from downstream events.
+    
+    ### AOP
+    Only report an existing AOP if the pathway is explicitly available in the provided AOP knowledge base.
+    Otherwise write: No matching AOP identified.
+    
+    ### Comparison
+    
+    Explain:
+    - Shared Key Events
+    - Different Key Events
+    - Missing KERs
+    - Potential extension of existing AOP
+    
+    ---
+    
+    # Final Output Requirements
+    
+    The final response must:
+    
+    - Use Markdown tables.
+    - Avoid unnecessary long explanations.
+    - Keep each description concise.
+    - Preserve evidence traceability.
+    - Never fabricate:
+      - KE IDs
+      - KER IDs
+      - Existing AOP pathways
+    
+    Always distinguish:
+    
+    ## Confirmed AOP Knowledge
+    
+    (Directly supported by experimental evidence)
+    
+    ## Missing Knowledge
+    
+    (Not represented in current AOP-Wiki but suggested by the paper)
+    
+    ## Hypothetical Extensions
+    
+    (Mechanistically plausible but requiring further validation)
+    
+    ---
+    
+    # Input Article
+    
+    [Insert full paper text here]""",  # <--- 请自行粘贴完整的 "Literature Analysis" 提示词
+    "Developing1": "developing。",
+    "Developing2": "developing。",
 }
+
 
 # -------------------------- KE ID 超链接转换函数 --------------------------
 def link_ke_ids(text):
     """将文本中的 KE数字（如 KE1574）替换为指向 AOP-Wiki 的超链接"""
     pattern = r'\b(KE)(\d+)\b'
+
     def replace(match):
-        ke_prefix = match.group(1)   # "KE"
-        ke_number = match.group(2)   # "1574"
+        ke_prefix = match.group(1)  # "KE"
+        ke_number = match.group(2)  # "1574"
         url = f"https://aopwiki.org/events/{ke_number}"
         return f'<a href="{url}" target="_blank" style="color:#1f77b4; font-weight:500; text-decoration:none;">{ke_prefix}{ke_number}</a>'
+
     return re.sub(pattern, replace, text)
+
 
 # -------------------------- 核心函数（与 Tkinter 版保持一致） --------------------------
 def clean_text(text, max_len, max_sentences=2):
@@ -238,9 +242,6 @@ def clean_text(text, max_len, max_sentences=2):
         text = text[:max_len].rsplit(" ", 1)[0]
     return text
 
-clean_text_ke = 200
-clean_text_ker = 120
-clean_text_ao = 250
 
 def simplify_context(selected_ke, selected_ker, selected_aop, kers, key_events):
     ke_entries = []
@@ -353,6 +354,7 @@ Definitions:
     AOP_smart = overall_prompt + "<KE>\n" + ke_prompt + ke_text + "</KE>\n\n" + "<KE_relation>\n" + ker_prompt + ker_text + "\n<KE_relation>" + "\n\n<AOP>\n" + aop_prompt + aop_text + "</AOP>"
     return AOP_smart
 
+
 def build_context_from_ke_ids(ke_ids):
     with open(SMART_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -435,6 +437,7 @@ def build_context_from_ke_ids(ke_ids):
     }
 
     return json.dumps(context, ensure_ascii=False, indent=2), stats
+
 
 def get_relevant_ke_ids(question, model_name, temperature, top_n, client):
     with open(INDEX_FILE, "r", encoding="utf-8") as f:
@@ -522,10 +525,10 @@ if "task_input" not in st.session_state:
 # ---------- 侧边栏 ----------
 with st.sidebar:
     st.header("⚙️ parameter setting")
-    
+
     max_tokens = st.number_input("📝 Max Output Tokens", value=20480, step=256)
     st.caption("Controls AI response length.")
-    
+
     top_n = st.number_input("🎯 Top N KEs", value=10, min_value=1, max_value=500)
     st.caption("How many Key Events to fetch — more context vs. precision.")
 
@@ -536,8 +539,9 @@ with st.sidebar:
     2. **Paste** your article or question into the text area.  
     3. **Press** the *Run* button and wait for the AI to generate the AOP report.
     """)
-    st.caption("💡 The preset adds a structured prompt to guide the AI. You can also leave it empty and enter your own question.")
-    
+    st.caption(
+        "💡 The preset adds a structured prompt to guide the AI. You can also leave it empty and enter your own question.")
+
     st.markdown("---")
     st.caption("Currently using DeepSeek-V4-Flash (lightweight demo version).")
     st.caption("📧 If you have any related questions, just ping me at niuqinjiang@163.com.")
@@ -568,26 +572,42 @@ with col_buttons:
 st.markdown("---")
 
 # ---------- 新增：PDF 上传按钮 ----------
-uploaded_file = st.file_uploader("📄 Upload PDF (optional — auto-fills content below)", type="pdf")
+uploaded_file = st.file_uploader("📄 Upload PDF (optional — auto-fills content below)", type="pdf", key="pdf_uploader")
 
 if uploaded_file is not None:
-    with st.spinner("Extracting text from PDF..."):
-        try:
-            pdf_bytes = BytesIO(uploaded_file.read())
-            reader = PdfReader(pdf_bytes)
-            full_text = ""
-            for page in reader.pages:
-                text = page.extract_text()
-                if text:
-                    full_text += text + "\n"
-            if full_text.strip():
-                st.session_state.task_input = full_text
-                st.success(f"✅ PDF parsed! {len(reader.pages)} pages, {len(full_text)} characters extracted. Content filled in below.")
-                st.rerun()
-            else:
-                st.warning("⚠️ No text could be extracted. The PDF might be scanned. Please paste content manually.")
-        except Exception as e:
-            st.error(f"❌ Failed to parse PDF: {e}")
+    # 生成当前文件的唯一标识（文件名+大小）
+    current_key = f"{uploaded_file.name}_{uploaded_file.size}"
+
+    # 如果文件发生了更换，重置处理标志
+    if st.session_state.get("last_pdf_key") != current_key:
+        st.session_state.pdf_processed = False
+        st.session_state.last_pdf_key = current_key
+
+    # 仅当文件尚未处理时才执行解析
+    if not st.session_state.get("pdf_processed", False):
+        with st.spinner("Extracting text from PDF..."):
+            try:
+                pdf_bytes = BytesIO(uploaded_file.read())
+                reader = PdfReader(pdf_bytes)
+                full_text = ""
+                for page in reader.pages:
+                    text = page.extract_text()
+                    if text:
+                        full_text += text + "\n"
+                if full_text.strip():
+                    st.session_state.task_input = full_text
+                    st.session_state.pdf_processed = True  # 标记已处理
+                    st.success(
+                        f"✅ PDF parsed! {len(reader.pages)} pages, {len(full_text)} characters extracted. Content filled in below.")
+                    st.rerun()  # 刷新界面使输入框显示新内容
+                else:
+                    st.warning(
+                        "⚠️ No text could be extracted. The PDF might be scanned. Please paste content manually.")
+                    # 扫描版 PDF 无法处理，不设置 processed，避免卡死
+            except Exception as e:
+                st.error(f"❌ Failed to parse PDF: {e}")
+                # 出错时重置标志，以便用户重新上传
+                st.session_state.pdf_processed = False
 
 # ---------- 主区域：输入框 ----------
 task = st.text_area("📝 Enter your question (Task)", key="task_input", height=150,
@@ -641,7 +661,8 @@ if st.button("🚀 Run", type="primary"):
                 stream = client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=[
-                        {"role": "system", "content": "You are AOP-Smart, an AI assistant for AOP reasoning. Answer based on provided context."},
+                        {"role": "system",
+                         "content": "You are AOP-Smart, an AI assistant for AOP reasoning. Answer based on provided context."},
                         {"role": "user", "content": f"""
 <AOP_CONTEXT>
 {context_json}
@@ -661,6 +682,7 @@ if st.button("🚀 Run", type="primary"):
                         yield chunk.choices[0].delta.content
             except Exception as e:
                 yield f"\n\n❌ Error: {e}"
+
 
         # 手动收集流式内容，结束后替换 KE ID 为超链接
         placeholder = st.empty()
