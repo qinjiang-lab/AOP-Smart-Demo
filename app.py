@@ -62,7 +62,7 @@ PRESETS = {
 
     ### AOP-Wiki KE ID
     - If an exact matching KE exists in the provided knowledge base:
-      - Provide the KE ID, example: KE1576
+      - Please note that the format "KE+ID" must be used. example: KE1576 
     - If no suitable KE exists:
       - Write: `Missing`
 
@@ -157,7 +157,7 @@ PRESETS = {
     AOP ID:
     AOP title:
 
-    Stressor → MIE → KE1 → KE2 → ... → AO
+    Stressor → MIE → KE564 → KE483 → ... → AO
 
     ### MIE
     If the molecular initiating event cannot be identified, explicitly state "Unknown".
