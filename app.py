@@ -528,6 +528,8 @@ if "pdf_processed" not in st.session_state:
     st.session_state.pdf_processed = False
 if "last_pdf_key" not in st.session_state:
     st.session_state.last_pdf_key = ""
+if "last_result" not in st.session_state:
+    st.session_state.last_result = ""  # 存储最终结果（已转换链接的 HTML）
 
 st.title("🧪 AOP-Smart")
 
@@ -615,20 +617,29 @@ if uploaded_file is not None:
 task = st.text_area("📝 Enter your question (Task)", key="task_input", height=150,
                     placeholder="e.g. What are the key events leading to liver fibrosis?")
 
+# ---------- 显示之前保存的结果（如果有） ----------
+if st.session_state.last_result:
+    st.markdown("---")
+    st.markdown("### 📄 Previous Result")
+    st.markdown(st.session_state.last_result, unsafe_allow_html=True)
+    # 可以加一个“清除结果”按钮，可选
+    if st.button("🗑️ Clear Result"):
+        st.session_state.last_result = ""
+        st.rerun()
+
 # ---------- Run 按钮 ----------
-# 按钮点击后只设置运行标志并刷新页面，立刻锁定按钮
 if st.button("🚀 Run", type="primary", disabled=st.session_state.running):
+    # 清空旧结果，避免干扰
+    st.session_state.last_result = ""
     st.session_state.running = True
-    st.session_state.analysis_started = False  # 确保每次点击重新开始
+    st.session_state.analysis_started = False
     st.rerun()
 
 # ---------- 分析执行块（在按钮外部） ----------
 if st.session_state.running and not st.session_state.analysis_started:
-    # 防止重复执行，设置标志
     st.session_state.analysis_started = True
 
     try:
-        # 读取输入
         task = st.session_state.task_input
         if not task.strip():
             st.warning("Please enter your question")
@@ -637,11 +648,9 @@ if st.session_state.running and not st.session_state.analysis_started:
             st.rerun()
             st.stop()
 
-        # 拼接预设
         preset = st.session_state.get("preset_prompt", "")
         final_question = preset + "\n\n" + task if preset else task
 
-        # 1. 读取 API Key
         api_key = st.secrets.get("DEEPSEEK_API_KEY")
         if not api_key:
             st.error("❌ API Key not found. Please set DEEPSEEK_API_KEY in secrets.")
@@ -653,7 +662,6 @@ if st.session_state.running and not st.session_state.analysis_started:
         client = OpenAI(api_key=api_key, base_url=BASE_URL)
         temperature = 0.0
 
-        # 2. Step 1: KE 选择（使用原始 task，不包含预设）
         with st.spinner("🧠 Selecting relevant Key Events ..."):
             ke_ids = get_relevant_ke_ids(task, MODEL_NAME, temperature, top_n, client)
 
@@ -666,7 +674,6 @@ if st.session_state.running and not st.session_state.analysis_started:
 
         st.success(f"✅ Selected {len(ke_ids)} Key Events: {ke_ids}")
 
-        # 3. Step 2: 构建上下文
         with st.spinner("📚 Building the context..."):
             context_json, stats = build_context_from_ke_ids(ke_ids)
 
@@ -678,7 +685,6 @@ if st.session_state.running and not st.session_state.analysis_started:
         )
         st.info(stat_msg)
 
-        # 4. Step 3: 流式推理（使用 final_question）
         with st.chat_message("assistant"):
             def generate_response(question):
                 try:
@@ -708,24 +714,23 @@ if st.session_state.running and not st.session_state.analysis_started:
                     yield f"\n\n❌ Error: {e}"
 
 
-            try:
-                placeholder = st.empty()
-                full_response = ""
-                for chunk in generate_response(final_question):
-                    full_response += chunk
-                    placeholder.markdown(full_response + "▌")
-                # 替换 KE ID 为超链接
-                linked_response = link_ke_ids(full_response)
-                placeholder.markdown(linked_response, unsafe_allow_html=True)
-
-            except Exception as e:
-                st.error(f"Error during response generation: {e}")
+            placeholder = st.empty()
+            full_response = ""
+            for chunk in generate_response(final_question):
+                full_response += chunk
+                placeholder.markdown(full_response + "▌")
+            # 转换链接并保存到 session_state
+            linked_response = link_ke_ids(full_response)
+            st.session_state.last_result = linked_response
+            placeholder.markdown(linked_response, unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Unexpected error: {e}")
+        st.session_state.last_result = ""  # 出错时清空
 
     finally:
-        # 分析结束，解锁按钮
+        # 解锁按钮
         st.session_state.running = False
         st.session_state.analysis_started = False
+        # 刷新页面，使按钮恢复可用，并显示保存的结果
         st.rerun()
