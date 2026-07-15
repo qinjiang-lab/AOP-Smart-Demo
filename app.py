@@ -508,7 +508,7 @@ if "preset_name" not in st.session_state:
 with st.sidebar:
     st.header("⚙️ parameter setting")
     
-    max_tokens = st.number_input("📝 Max Output Tokens", value=4096, step=256)
+    max_tokens = st.number_input("📝 Max Output Tokens", value=20480, step=256)
     st.caption("Controls AI response length.")
     
     top_n = st.number_input("🎯 Top N KEs", value=5, min_value=1, max_value=20)
