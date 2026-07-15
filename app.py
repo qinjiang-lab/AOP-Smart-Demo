@@ -60,7 +60,7 @@ For each Key Event, generate the following table:
 
 ### AOP-Wiki KE ID
 - If an exact matching KE exists in the provided knowledge base:
-  - Provide the KE ID.
+  - Provide the KE ID, example: KE1576
 - If no suitable KE exists:
   - Write: `Missing`
 
@@ -210,6 +210,17 @@ Always distinguish:
     "毒性预测": "分析以下文献，预测该化学物质可能触发的AOP通路，并说明从分子起始事件到不良结局的因果链条。",
     "机制总结": "请归纳以下文献中描述的AOP机制，重点说明KE之间的因果关系和生物学合理性。",
 }
+
+# -------------------------- KE ID 超链接转换函数 --------------------------
+def link_ke_ids(text):
+    """将文本中的 KE数字（如 KE1574）替换为指向 AOP-Wiki 的超链接"""
+    pattern = r'\b(KE)(\d+)\b'
+    def replace(match):
+        ke_prefix = match.group(1)   # "KE"
+        ke_number = match.group(2)   # "1574"
+        url = f"https://aopwiki.org/events/{ke_number}"
+        return f'<a href="{url}" target="_blank" style="color:#1f77b4; font-weight:500; text-decoration:none;">{ke_prefix}{ke_number}</a>'
+    return re.sub(pattern, replace, text)
 
 # -------------------------- 核心函数（与 Tkinter 版保持一致） --------------------------
 def clean_text(text, max_len, max_sentences=2):
@@ -598,6 +609,7 @@ if st.button("🚀 Run", type="primary"):
 
     # 4. Step 3: 流式推理（使用 final_question）
     with st.chat_message("assistant"):
+        # 定义生成器
         def generate_response(question):
             try:
                 stream = client.chat.completions.create(
@@ -624,7 +636,18 @@ if st.button("🚀 Run", type="primary"):
             except Exception as e:
                 yield f"\n\n❌ Error: {e}"
 
-        st.write_stream(generate_response(final_question))
+        # 手动收集流式内容，结束后替换 KE ID 为超链接
+        placeholder = st.empty()
+        full_response = ""
+
+        # 流式输出并实时显示（带光标效果）
+        for chunk in generate_response(final_question):
+            full_response += chunk
+            placeholder.markdown(full_response + "▌")
+
+        # 输出完成后，替换 KE ID 为超链接
+        linked_response = link_ke_ids(full_response)
+        placeholder.markdown(linked_response, unsafe_allow_html=True)
 
     # 可选：保存历史（可自行添加）
     # 如想保存，可写入 session_state 或文件
