@@ -6,9 +6,9 @@ from openai import OpenAI
 from datetime import datetime
 
 # -------------------------- 全局配置（写死） --------------------------
-BASE_URL = "https://api.deepseek.com"  # 写死，可替换
-MODEL_NAME = "deepseek-v4-flash"  # 写死模型名
-# API Key 从 st.secrets 中读取，部署时在 Streamlit Cloud 的 Secrets 中设置
+BASE_URL = "https://api.deepseek.com"          # 可替换
+MODEL_NAME = "deepseek-v4-flash"              # 写死模型名
+# API Key 从 st.secrets 中读取
 # 本地测试时可在 .streamlit/secrets.toml 中写入：
 # DEEPSEEK_API_KEY = "your-api-key"
 
@@ -16,8 +16,202 @@ MODEL_NAME = "deepseek-v4-flash"  # 写死模型名
 INDEX_FILE = "./Index.txt"
 SMART_FILE = "./AOP-Smart.json"
 
+# -------------------------- 预设提示词字典 --------------------------
+# 注意：长提示词（Literature Analysis）请自行填入完整的英文 prompt。
+# 这里只留占位符，以免代码过长。
+PRESETS = {
+    "Literature Analysis": 
+    """Your task is to convert the input toxicological article into a **structured AOP representation** grounded in the provided AOP knowledge base.
 
-# -------------------------- 核心函数（基本原封不动） --------------------------
+---
+
+# General Principles
+
+Please follow these rules:
+
+1. Only extract biological mechanisms supported by evidence from the paper.
+2. Do not invent Key Events (KEs), Key Event Relationships (KERs), or AOP-Wiki IDs.
+3. If no suitable AOP-Wiki entity exists, explicitly mark it as **Missing**.
+4. Prefer precision over recall.
+5. Maintain traceability between extracted knowledge and the original paper.
+6. Clearly distinguish:
+   - Confirmed evidence
+   - Strong mechanistic inference
+   - Hypothetical knowledge gaps
+
+The final output should be concise, structured, and suitable for AOP knowledge curation.
+
+---
+
+# Step 1. Key Event (KE) Extraction
+
+Identify all biologically meaningful Key Events described in the article.
+
+Exclude:
+- Simple experimental observations without mechanistic meaning.
+- General physiological changes without clear biological relevance.
+
+For each Key Event, generate the following table:
+
+| AOP-Wiki KE ID | KE Title | Description | Biological Level | Organ/Tissue | Cell Type | Evidence Type | Evidence from Paper |
+|---|---|---|---|---|---|---|
+
+## Requirements:
+
+### AOP-Wiki KE ID
+- If an exact matching KE exists in the provided knowledge base:
+  - Provide the KE ID.
+- If no suitable KE exists:
+  - Write: `Missing`
+
+### KE Title
+- Use official AOP-Wiki terminology whenever possible.
+- If missing, provide a concise biological event name.
+
+### Biological Level
+Choose one:
+
+- Molecular
+- Cellular
+- Tissue
+- Organ
+- Organism
+
+### Description
+- The description field is limited to one sentence.
+
+### Evidence Type
+
+Choose one:
+
+- Direct experimental evidence
+- Strong mechanistic inference
+- Hypothetical extension
+
+### Evidence from Paper
+Provide:
+- The most relevant experimental finding.
+- A short quote or accurate summary from the article.
+
+---
+
+# Step 2. Key Event Relationship (KER) Extraction
+
+Identify causal relationships between Key Events.
+
+Only include relationships supported by:
+
+- Experimental evidence from the paper, or
+- Strong established biological mechanisms.
+
+Do not create KERs only because two events are biologically related;
+the relationship must represent a causal transition within an AOP framework.
+
+Generate the following table:
+
+| Upstream KE | Downstream KE | KE IDs | Relationship Description | Evidence Type | Evidence from Paper |
+|---|---|---|---|---|---|
+
+## Requirements:
+
+### KE IDs format:
+
+Examples:
+
+KE1115 → KE1392
+KE1115 → Missing
+Missing → KE344
+
+### Evidence Type:
+- Direct experimental evidence
+- Strong mechanistic inference
+- Hypothetical extension
+
+### Relationship Description
+
+Briefly explain:
+
+- Biological mechanism
+- Direction of change
+- Why upstream event can lead to downstream event
+
+Do not include unsupported causal assumptions.
+
+---
+
+# Step 3. Candidate AOP Reconstruction
+
+## Candidate AOP Reconstruction and Comparison with Existing AOPs
+
+Generate:
+
+### Candidate AOP
+
+Stressor → MIE → KE1 → KE2 → ... → AO
+
+
+### Closest Existing AOP-Wiki Pathway
+
+AOP ID:
+AOP title:
+
+Stressor → MIE → KE1 → KE2 → ... → AO
+
+### MIE
+If the molecular initiating event cannot be identified, explicitly state "Unknown".
+Do not infer an MIE solely from downstream events.
+
+### AOP
+Only report an existing AOP if the pathway is explicitly available in the provided AOP knowledge base.
+Otherwise write: No matching AOP identified.
+
+### Comparison
+
+Explain:
+- Shared Key Events
+- Different Key Events
+- Missing KERs
+- Potential extension of existing AOP
+
+---
+
+# Final Output Requirements
+
+The final response must:
+
+- Use Markdown tables.
+- Avoid unnecessary long explanations.
+- Keep each description concise.
+- Preserve evidence traceability.
+- Never fabricate:
+  - KE IDs
+  - KER IDs
+  - Existing AOP pathways
+
+Always distinguish:
+
+## Confirmed AOP Knowledge
+
+(Directly supported by experimental evidence)
+
+## Missing Knowledge
+
+(Not represented in current AOP-Wiki but suggested by the paper)
+
+## Hypothetical Extensions
+
+(Mechanistically plausible but requiring further validation)
+
+---
+
+# Input Article
+
+[Insert full paper text here]""",   # <--- 请自行粘贴完整的 "Literature Analysis" 提示词
+    "毒性预测": "分析以下文献，预测该化学物质可能触发的AOP通路，并说明从分子起始事件到不良结局的因果链条。",
+    "机制总结": "请归纳以下文献中描述的AOP机制，重点说明KE之间的因果关系和生物学合理性。",
+}
+
+# -------------------------- 核心函数（与 Tkinter 版保持一致） --------------------------
 def clean_text(text, max_len, max_sentences=2):
     if not text:
         return "-"
@@ -31,11 +225,9 @@ def clean_text(text, max_len, max_sentences=2):
         text = text[:max_len].rsplit(" ", 1)[0]
     return text
 
-
 clean_text_ke = 200
 clean_text_ker = 120
 clean_text_ao = 250
-
 
 def simplify_context(selected_ke, selected_ker, selected_aop, kers, key_events):
     ke_entries = []
@@ -148,7 +340,6 @@ Definitions:
     AOP_smart = overall_prompt + "<KE>\n" + ke_prompt + ke_text + "</KE>\n\n" + "<KE_relation>\n" + ker_prompt + ker_text + "\n<KE_relation>" + "\n\n<AOP>\n" + aop_prompt + aop_text + "</AOP>"
     return AOP_smart
 
-
 def build_context_from_ke_ids(ke_ids):
     with open(SMART_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -232,8 +423,6 @@ def build_context_from_ke_ids(ke_ids):
 
     return json.dumps(context, ensure_ascii=False, indent=2), stats
 
-
-# -------------------------- Step 1: KE 选择（去除Tkinter依赖） --------------------------
 def get_relevant_ke_ids(question, model_name, temperature, top_n, client):
     with open(INDEX_FILE, "r", encoding="utf-8") as f:
         index_data = f.read()
@@ -309,7 +498,13 @@ Constraints:
 st.set_page_config(page_title="AOP-Smart", layout="wide")
 st.title("🧪 AOP-Smart")
 
-# ---------- 侧边栏：可调参数 ----------
+# 初始化 session_state 预设状态
+if "preset_prompt" not in st.session_state:
+    st.session_state.preset_prompt = ""
+if "preset_name" not in st.session_state:
+    st.session_state.preset_name = "None"
+
+# ---------- 侧边栏 ----------
 with st.sidebar:
     st.header("⚙️ parameter setting")
     
@@ -325,24 +520,53 @@ with st.sidebar:
     st.caption("💰 We've topped up the demo budget — so feel free to explore!")
     st.caption("📧 If the balance somehow runs low, just ping me at niuqinjiang@163.com.")
     st.caption("🚀 For stronger models, check out local deployment: https://github.com/qinjiang-lab/AOP-Smart")
-# ---------- 主区域 ----------
-task = st.text_area("📝 Enter your question（Task）", height=150, placeholder="for example ：What are the key events leading to liver fibrosis?")
+
+# ---------- 主区域：预设按钮 ----------
+st.markdown("---")
+col_state, col_buttons = st.columns([1, 4])
+with col_state:
+    st.write(f"**Current Preset:** {st.session_state.preset_name}")
+
+with col_buttons:
+    # 根据 PRESETS 数量生成按钮
+    num_presets = len(PRESETS)
+    cols = st.columns(num_presets + 1)  # +1 给 Clear 按钮
+    for idx, (name, prompt) in enumerate(PRESETS.items()):
+        with cols[idx]:
+            if st.button(name, key=f"preset_{idx}"):
+                st.session_state.preset_prompt = prompt
+                st.session_state.preset_name = name
+                st.rerun()
+    with cols[-1]:
+        if st.button("Clear Preset", key="clear_preset"):
+            st.session_state.preset_prompt = ""
+            st.session_state.preset_name = "None"
+            st.rerun()
+st.markdown("---")
+
+# ---------- 主区域：输入框 ----------
+task = st.text_area("📝 Enter your question (Task)", key="task_input", height=150,
+                    placeholder="e.g. What are the key events leading to liver fibrosis?")
 
 if st.button("🚀 Run", type="primary"):
     if not task.strip():
         st.warning("Please enter your question")
         st.stop()
 
-    # 1. 读取 API Key（从 secrets）
+    # 拼接预设
+    preset = st.session_state.get("preset_prompt", "")
+    final_question = preset + "\n\n" + task if preset else task
+
+    # 1. 读取 API Key
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
     if not api_key:
-        st.error("❌ API Key not found")
+        st.error("❌ API Key not found. Please set DEEPSEEK_API_KEY in secrets.")
         st.stop()
 
-    # 2. 初始化 OpenAI 客户端
     client = OpenAI(api_key=api_key, base_url=BASE_URL)
     temperature = 0.0
-    # 3. Step 1: 选择 KE（显示进度）
+
+    # 2. Step 1: KE 选择（使用原始 task，不包含预设）
     with st.spinner("🧠 Selecting relevant Key Events ..."):
         ke_ids = get_relevant_ke_ids(task, MODEL_NAME, temperature, top_n, client)
 
@@ -350,40 +574,37 @@ if st.button("🚀 Run", type="primary"):
         st.error("❌ No relevant KE was found. Please try another question.")
         st.stop()
 
-    st.success(f"✅ Select {len(ke_ids)}   Key Events: {ke_ids}")
+    st.success(f"✅ Selected {len(ke_ids)} Key Events: {ke_ids}")
 
-    # 4. Step 2: 构建上下文（显示统计信息）
+    # 3. Step 2: 构建上下文
     with st.spinner("📚 Building the context..."):
         context_json, stats = build_context_from_ke_ids(ke_ids)
 
-    # 显示统计信息
     stat_msg = (
         f"**Activated KE**: {stats['activated_ke_count']} ({stats['ke_percent']}%)  \n"
         f"**Activated KER**: {stats['activated_ker_count']} ({stats['ker_percent']}%)  \n"
         f"**Activated AOP**: {stats['activated_aop_count']} ({stats['aop_percent']}%)  \n"
         f"**Context Token Count (approx.)**: {stats['context_word_count']}"
     )
+    st.info(stat_msg)
 
-    # 5. Step 3: 流式推理
+    # 4. Step 3: 流式推理（使用 final_question）
     with st.chat_message("assistant"):
-        # 定义生成器
-        def generate_response():
+        def generate_response(question):
             try:
                 stream = client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=[
-                        {"role": "system",
-                         "content": "You are AOP-Smart, an AI assistant for AOP reasoning. Answer based on provided context."},
+                        {"role": "system", "content": "You are AOP-Smart, an AI assistant for AOP reasoning. Answer based on provided context."},
                         {"role": "user", "content": f"""
 <AOP_CONTEXT>
 {context_json}
 </AOP_CONTEXT>
 
 <Question>
-{task}
+{question}
 </Question>
-"""
-                         }
+"""}
                     ],
                     max_tokens=max_tokens,
                     temperature=temperature,
@@ -395,9 +616,7 @@ if st.button("🚀 Run", type="primary"):
             except Exception as e:
                 yield f"\n\n❌ Error: {e}"
 
+        st.write_stream(generate_response(final_question))
 
-        # 使用 st.write_stream 实现流式输出
-        st.write_stream(generate_response())
-
-    # 可选：保存历史（不强制）
-    # 你可以选择将对话记录到 st.session_state 或外部存储
+    # 可选：保存历史（可自行添加）
+    # 如想保存，可写入 session_state 或文件
