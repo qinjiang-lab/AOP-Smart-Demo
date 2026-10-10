@@ -11,7 +11,7 @@ import traceback
 
 # -------------------------- 全局配置 --------------------------
 BASE_URL = "https://api.deepseek.com"
-MODEL_NAME = "deepseek-flash"   
+MODEL_NAME = "deepseek-flash"
 
 clean_text_ke = 200
 clean_text_ker = 120
@@ -216,7 +216,6 @@ PRESETS = {
 
 # -------------------------- KE ID 超链接转换函数 --------------------------
 def link_ke_ids(text):
-    """将文本中的 KE数字（如 KE1574）替换为指向 AOP-Wiki 的超链接"""
     pattern = r'\b(KE)(\d+)\b'
 
     def replace(match):
@@ -444,7 +443,7 @@ def get_relevant_ke_ids(question, model_name, temperature, top_n, client):
     with open(INDEX_FILE, "r", encoding="utf-8") as f:
         index_data = f.read()
 
-    st.write(f"🐛 [DEBUG] Index 长度: {len(index_data)} 字符")   # ← 改动5
+    st.write(f"🐛 [DEBUG] Index 长度: {len(index_data)} 字符")
 
     system_prompt = f"""You are AOP-Smart, an expert system for Adverse Outcome Pathways (AOP).
 Below is the index of all known Key Events (KEs).
@@ -493,7 +492,7 @@ Constraints:
 """
 
     try:
-        st.write(f"🐛 [DEBUG] 调用 API: model={model_name}")   # ← 改动5
+        st.write(f"🐛 [DEBUG] 调用 API: model={model_name}")
         response = client.chat.completions.create(
             model=model_name,
             messages=[
@@ -501,25 +500,55 @@ Constraints:
                 {"role": "user", "content": f"{index_data}\n\nQuestion:\n{question}"}
             ],
             temperature=temperature,
-            max_tokens=5000
+            max_tokens=5000,
+            timeout=120,
         )
-        text = response.choices[0].message.content.strip()
-        st.write(f"🐛 [DEBUG] API 返回原文（前 300 字符）: {text[:300]!r}")   # ← 改动5
+
+        st.write(f"🐛 [DEBUG] API 调用成功返回")
+
+        if not response.choices:
+            st.error("❌ API 返回 choices 为空")
+            return []
+
+        choice = response.choices[0]
+        st.write(f"🐛 [DEBUG] finish_reason: {choice.finish_reason}")
+
+        msg = choice.message
+        st.write(f"🐛 [DEBUG] message.content: {repr(msg.content)[:500]}")
+
+        raw_content = msg.content
+        # 兼容 reasoning 模型
+        if not raw_content and hasattr(msg, "reasoning_content"):
+            st.warning("⚠️ content 为空，尝试从 reasoning_content 取")
+            raw_content = getattr(msg, "reasoning_content", None)
+
+        if not raw_content:
+            st.error("❌ 模型返回的 content 为 None（可能 token 不足或被截断）")
+            return []
+
+        text = raw_content.strip()
+        st.write(f"🐛 [DEBUG] 提取文本（前 300 字符）: {text[:300]!r}")
 
         match = re.search(r"\[(.*?)\]", text)
         if match:
             ids = match.group(1).split(",")
-            return [i.strip() for i in ids if i.strip()]
+            result = [i.strip() for i in ids if i.strip()]
+            st.write(f"🐛 [DEBUG] 解析出的 KE IDs: {result}")
+            return result
+
+        st.warning("⚠️ 未从返回内容中解析出 [1,2,3] 格式的 ID")
         return []
+
     except Exception as e:
-        st.error(f"❌ KE Selection Error: {e}")
-        st.code(traceback.format_exc())   # ← 改动5：打印完整堆栈
+        st.error(f"❌ KE Selection Error: {type(e).__name__}: {e}")
+        st.code(traceback.format_exc())
         return []
 
 
 # -------------------------- Streamlit 界面 --------------------------
 st.set_page_config(page_title="AOP-Smart", layout="wide")
 
+# ---------- 初始化 session_state ----------
 if "running" not in st.session_state:
     st.session_state.running = False
 if "analysis_started" not in st.session_state:
@@ -726,7 +755,6 @@ if st.button("🚀 Run", type="primary", disabled=st.session_state.running):
 if st.session_state.running and not st.session_state.analysis_started:
     st.session_state.analysis_started = True
 
-    # ========== DEBUG 起始标记 ==========
     st.write("🐛 [DEBUG] ========== 进入分析块 ==========")
 
     try:
@@ -737,8 +765,7 @@ if st.session_state.running and not st.session_state.analysis_started:
             st.warning("Please enter your question")
             st.session_state.running = False
             st.session_state.analysis_started = False
-            st.rerun()
-            st.stop()
+            st.stop()   # ✅ 用 st.stop() 而非 st.rerun()
 
         preset = st.session_state.get("preset_prompt", "")
         final_question = preset + "\n\n" + task if preset else task
@@ -750,8 +777,7 @@ if st.session_state.running and not st.session_state.analysis_started:
             st.error("❌ API Key not found. Please set DEEPSEEK_API_KEY in secrets.")
             st.session_state.running = False
             st.session_state.analysis_started = False
-            st.rerun()
-            st.stop()
+            st.stop()   # ✅ 用 st.stop()
 
         st.write(f"🐛 [DEBUG] BASE_URL = {BASE_URL}")
         st.write(f"🐛 [DEBUG] MODEL_NAME = {MODEL_NAME}")
@@ -768,8 +794,7 @@ if st.session_state.running and not st.session_state.analysis_started:
             st.error("❌ No relevant KE was found. Please try another question.")
             st.session_state.running = False
             st.session_state.analysis_started = False
-            st.rerun()
-            st.stop()
+            st.stop()   # ✅ 用 st.stop()，错误会留在页面上
 
         st.success(f"✅ Selected {len(ke_ids)} Key Events: {ke_ids}")
 
@@ -830,11 +855,11 @@ if st.session_state.running and not st.session_state.analysis_started:
         st.success("✅ 分析完成，结果已保存。")
 
     except Exception as e:
-        st.error(f"❌ Unexpected error: {e}")
+        st.error(f"❌ Unexpected error: {type(e).__name__}: {e}")
         st.code(traceback.format_exc())
         st.session_state.last_result = ""
 
     finally:
         st.session_state.running = False
         st.session_state.analysis_started = False
-        # ❌ 改动2：去掉 st.rerun()，避免冲掉所有中间输出
+        # ✅ 不再 st.rerun()，让页面保留所有输出
