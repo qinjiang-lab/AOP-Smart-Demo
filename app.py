@@ -500,7 +500,7 @@ Constraints:
                 {"role": "user", "content": f"{index_data}\n\nQuestion:\n{question}"}
             ],
             temperature=temperature,
-            max_tokens=5000,
+            max_tokens=20000,
             timeout=120,
         )
 
