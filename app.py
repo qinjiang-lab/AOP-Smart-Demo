@@ -11,7 +11,7 @@ import traceback
 
 # -------------------------- 全局配置 --------------------------
 BASE_URL = "https://api.deepseek.com"
-MODEL_NAME = "deepseek-chat"   # ⚠️ 改动1：deepseek-flash 不是官方模型名，改回 deepseek-chat
+MODEL_NAME = "deepseek-flash"   
 
 clean_text_ke = 200
 clean_text_ker = 120
