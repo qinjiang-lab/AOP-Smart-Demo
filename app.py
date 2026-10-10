@@ -10,7 +10,7 @@ import markdown  # 新增：用于将Markdown转为HTML
 
 # -------------------------- 全局配置 --------------------------
 BASE_URL = "https://api.deepseek.com"  # 可替换
-MODEL_NAME = "deepseek-v4-flash"  # 写死模型名
+MODEL_NAME = "deepseek-flash"  # 写死模型名
 # API Key 从 st.secrets 中读取
 
 clean_text_ke = 200
