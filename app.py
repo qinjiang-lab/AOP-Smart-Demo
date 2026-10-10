@@ -6,18 +6,17 @@ from openai import OpenAI
 from datetime import datetime
 from pypdf import PdfReader
 from io import BytesIO
-import markdown  # 新增：用于将Markdown转为HTML
+import markdown
+import traceback
 
 # -------------------------- 全局配置 --------------------------
-BASE_URL = "https://api.deepseek.com"  # 可替换
-MODEL_NAME = "deepseek-flash"  # 写死模型名
-# API Key 从 st.secrets 中读取
+BASE_URL = "https://api.deepseek.com"
+MODEL_NAME = "deepseek-chat"   # ⚠️ 改动1：deepseek-flash 不是官方模型名，改回 deepseek-chat
 
 clean_text_ke = 200
 clean_text_ker = 120
 clean_text_ao = 250
 
-# -------------------------- 文件路径 --------------------------
 INDEX_FILE = "./Index.txt"
 SMART_FILE = "./AOP-Smart.json"
 
@@ -209,7 +208,7 @@ PRESETS = {
 
     # Input Article
 
-    [Insert full paper text here]""",  # <--- 请自行粘贴完整的 "Literature Analysis" 提示词
+    [Insert full paper text here]""",
     "Developing1": "developing。",
     "Developing2": "developing。",
 }
@@ -221,15 +220,15 @@ def link_ke_ids(text):
     pattern = r'\b(KE)(\d+)\b'
 
     def replace(match):
-        ke_prefix = match.group(1)  # "KE"
-        ke_number = match.group(2)  # "1574"
+        ke_prefix = match.group(1)
+        ke_number = match.group(2)
         url = f"https://aopwiki.org/events/{ke_number}"
         return f'<a href="{url}" target="_blank" style="color:#1f77b4; font-weight:500; text-decoration:none;">{ke_prefix}{ke_number}</a>'
 
     return re.sub(pattern, replace, text)
 
 
-# -------------------------- 核心函数（与 Tkinter 版保持一致） --------------------------
+# -------------------------- 核心函数 --------------------------
 def clean_text(text, max_len, max_sentences=2):
     if not text:
         return "-"
@@ -289,6 +288,7 @@ Each KE is enclosed in square brackets [] with fields separated by '|':
         app_str = f"sex:{','.join(sex_list)}|life_stage:{','.join(life_stage_list)}|taxonomy:{','.join(taxonomy_list)}"
         ker_entry = f"[{upstream}->{downstream}|{description}|{app_str}]"
         ker_entries.append(ker_entry)
+
     ker_prompt = """Below is a list of Key Event Relationships (KERs) in a simplified format.
 Each KER is in its own square brackets [] in the following format:
 [upstream_id -> downstream_id | description | applicability]
@@ -444,6 +444,8 @@ def get_relevant_ke_ids(question, model_name, temperature, top_n, client):
     with open(INDEX_FILE, "r", encoding="utf-8") as f:
         index_data = f.read()
 
+    st.write(f"🐛 [DEBUG] Index 长度: {len(index_data)} 字符")   # ← 改动5
+
     system_prompt = f"""You are AOP-Smart, an expert system for Adverse Outcome Pathways (AOP).
 Below is the index of all known Key Events (KEs).
 Each line is in the format:
@@ -491,6 +493,7 @@ Constraints:
 """
 
     try:
+        st.write(f"🐛 [DEBUG] 调用 API: model={model_name}")   # ← 改动5
         response = client.chat.completions.create(
             model=model_name,
             messages=[
@@ -501,20 +504,22 @@ Constraints:
             max_tokens=5000
         )
         text = response.choices[0].message.content.strip()
+        st.write(f"🐛 [DEBUG] API 返回原文（前 300 字符）: {text[:300]!r}")   # ← 改动5
+
         match = re.search(r"\[(.*?)\]", text)
         if match:
             ids = match.group(1).split(",")
             return [i.strip() for i in ids if i.strip()]
         return []
     except Exception as e:
-        st.error(f"KE Selection Error: {e}")
+        st.error(f"❌ KE Selection Error: {e}")
+        st.code(traceback.format_exc())   # ← 改动5：打印完整堆栈
         return []
 
 
 # -------------------------- Streamlit 界面 --------------------------
 st.set_page_config(page_title="AOP-Smart", layout="wide")
 
-# ---------- 初始化 session_state ----------
 if "running" not in st.session_state:
     st.session_state.running = False
 if "analysis_started" not in st.session_state:
@@ -530,7 +535,7 @@ if "pdf_processed" not in st.session_state:
 if "last_pdf_key" not in st.session_state:
     st.session_state.last_pdf_key = ""
 if "last_result" not in st.session_state:
-    st.session_state.last_result = ""  # 存储最终结果（已转换链接的 HTML）
+    st.session_state.last_result = ""
 
 st.title("🧪 AOP-Smart")
 
@@ -555,8 +560,6 @@ with st.sidebar:
     """)
     st.caption(
         "💡 The preset adds a structured prompt to guide the AI. You can also leave it empty and enter your own question.")
-    st.markdown("---")
-
     st.markdown("---")
     st.caption("Currently using DeepSeek-V4-Flash (lightweight demo version).")
     st.caption("📧 If you have any related questions, just ping me at niuqinjiang@163.com.")
@@ -627,17 +630,13 @@ if st.session_state.last_result:
     st.markdown("### 📄 Previous Result")
     st.markdown(st.session_state.last_result, unsafe_allow_html=True)
 
-    # 按钮行：清除结果 + 下载 HTML
     col1, col2 = st.columns([1, 1])
     with col1:
         if st.button("🗑️ Clear Result"):
             st.session_state.last_result = ""
             st.rerun()
     with col2:
-        # 使用 markdown 库将 Markdown 内容转换为 HTML（保留 <a> 标签）
         md_content = st.session_state.last_result
-        # 注意：last_result 中已经包含 <a> 标签，这些是 HTML，markdown 库会原样保留
-        # 同时 Markdown 表格会被解析为 HTML 表格
         html_body = markdown.markdown(md_content, extensions=['extra', 'tables'])
 
         html_content = f"""
@@ -723,12 +722,17 @@ if st.button("🚀 Run", type="primary", disabled=st.session_state.running):
     st.session_state.analysis_started = False
     st.rerun()
 
-# ---------- 分析执行块（在按钮外部） ----------
+# ---------- 分析执行块 ----------
 if st.session_state.running and not st.session_state.analysis_started:
     st.session_state.analysis_started = True
 
+    # ========== DEBUG 起始标记 ==========
+    st.write("🐛 [DEBUG] ========== 进入分析块 ==========")
+
     try:
         task = st.session_state.task_input
+        st.write(f"🐛 [DEBUG] task 长度: {len(task) if task else 0}")
+
         if not task.strip():
             st.warning("Please enter your question")
             st.session_state.running = False
@@ -738,8 +742,10 @@ if st.session_state.running and not st.session_state.analysis_started:
 
         preset = st.session_state.get("preset_prompt", "")
         final_question = preset + "\n\n" + task if preset else task
+        st.write(f"🐛 [DEBUG] preset 长度: {len(preset)}")
 
         api_key = st.secrets.get("DEEPSEEK_API_KEY")
+        st.write(f"🐛 [DEBUG] api_key 存在: {bool(api_key)}")
         if not api_key:
             st.error("❌ API Key not found. Please set DEEPSEEK_API_KEY in secrets.")
             st.session_state.running = False
@@ -747,11 +753,16 @@ if st.session_state.running and not st.session_state.analysis_started:
             st.rerun()
             st.stop()
 
+        st.write(f"🐛 [DEBUG] BASE_URL = {BASE_URL}")
+        st.write(f"🐛 [DEBUG] MODEL_NAME = {MODEL_NAME}")
+
         client = OpenAI(api_key=api_key, base_url=BASE_URL)
         temperature = 0.0
 
         with st.spinner("🧠 Selecting relevant Key Events ..."):
+            st.write("🐛 [DEBUG] 即将调用 get_relevant_ke_ids ...")
             ke_ids = get_relevant_ke_ids(task, MODEL_NAME, temperature, top_n, client)
+            st.write(f"🐛 [DEBUG] get_relevant_ke_ids 返回: {ke_ids}")
 
         if not ke_ids:
             st.error("❌ No relevant KE was found. Please try another question.")
@@ -763,7 +774,9 @@ if st.session_state.running and not st.session_state.analysis_started:
         st.success(f"✅ Selected {len(ke_ids)} Key Events: {ke_ids}")
 
         with st.spinner("📚 Building the context..."):
+            st.write("🐛 [DEBUG] 即将 build_context ...")
             context_json, stats = build_context_from_ke_ids(ke_ids)
+            st.write(f"🐛 [DEBUG] context 长度: {len(context_json)}")
 
         stat_msg = (
             f"**Activated KE**: {stats['activated_ke_count']} ({stats['ke_percent']}%)  \n"
@@ -776,20 +789,21 @@ if st.session_state.running and not st.session_state.analysis_started:
         with st.chat_message("assistant"):
             def generate_response(question):
                 try:
+                    st.write("🐛 [DEBUG] 即将调用 LLM stream ...")
                     stream = client.chat.completions.create(
                         model=MODEL_NAME,
                         messages=[
                             {"role": "system",
                              "content": "You are AOP-Smart, an AI assistant for AOP reasoning. Answer based on provided context."},
                             {"role": "user", "content": f"""
-        <AOP_CONTEXT>
-        {context_json}
-        </AOP_CONTEXT>
+<AOP_CONTEXT>
+{context_json}
+</AOP_CONTEXT>
 
-        <Question>
-        {question}
-        </Question>
-        """}
+<Question>
+{question}
+</Question>
+"""}
                         ],
                         max_tokens=max_tokens,
                         temperature=temperature,
@@ -801,22 +815,26 @@ if st.session_state.running and not st.session_state.analysis_started:
                 except Exception as e:
                     yield f"\n\n❌ Error: {e}"
 
-
             placeholder = st.empty()
             full_response = ""
             for chunk in generate_response(final_question):
                 full_response += chunk
                 placeholder.markdown(full_response + "▌")
-            # 转换链接并保存到 session_state
+
+            st.write(f"🐛 [DEBUG] stream 完成，长度: {len(full_response)}")
+
             linked_response = link_ke_ids(full_response)
             st.session_state.last_result = linked_response
             placeholder.markdown(linked_response, unsafe_allow_html=True)
 
+        st.success("✅ 分析完成，结果已保存。")
+
     except Exception as e:
-        st.error(f"Unexpected error: {e}")
+        st.error(f"❌ Unexpected error: {e}")
+        st.code(traceback.format_exc())
         st.session_state.last_result = ""
 
     finally:
         st.session_state.running = False
         st.session_state.analysis_started = False
-        st.rerun()
+        # ❌ 改动2：去掉 st.rerun()，避免冲掉所有中间输出
